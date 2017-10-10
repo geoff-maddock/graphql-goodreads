@@ -25,19 +25,19 @@ const BookType = new GraphQLObjectType({
     fields: () => ({
         title: {
             type: GraphQLString,
-            resolve: xml => xml.title[0]
+            resolve: xml => xml.GoodreadsResponse.book[0].title[0]
 
         },
         isbn: {
             type: GraphQLString,
-            resolve: xml => xml.isbn[0]
+            resolve: xml => xml.GoodreadsResponse.book[0].isbn[0]
         }
     })
 })
 
 const AuthorType = new GraphQLObjectType({
     name: 'Author',
-    descriptioN: '...',
+    description: '...',
 
     fields: () => ({
         name: {
@@ -45,10 +45,16 @@ const AuthorType = new GraphQLObjectType({
             resolve: xml =>
                 xml.GoodreadsResponse.author[0].name[0]
         },
-        books: { 
+        books: {
             type: new GraphQLList(BookType),
-            resolve: xml =>
-                xml.GoodreadsResponse.author[0].books[0].book
+            resolve: xml => {
+                const ids = xml.GoodreadsResponse.author[0].books[0].book.map(elem => elem.id[0]._)
+                return Promise.all(ids.map(id =>
+                    fetch(`https://www.goodreads.com/book/show.xml?id=${id}&key=PjMitv9zZjHUN0pYznUUiw`)
+                        .then(response => response.text())
+                        .then(parseXML)
+                ))
+            }
         }
     })
 })
