@@ -1,5 +1,6 @@
 const fetch = require('node-fetch')
 const util = require('util')
+const DataLoader = require('dataloader')
 const parseXML = util.promisify(require('xml2js').parseString)
 const {
     GraphQLSchema,
@@ -30,6 +31,7 @@ function translate(lang, str) {
             )
 }
 
+
 const BookType = new GraphQLObjectType({
     name: 'Book',
     description: '...',
@@ -49,6 +51,14 @@ const BookType = new GraphQLObjectType({
         isbn: {
             type: GraphQLString,
             resolve: xml => xml.GoodreadsResponse.book[0].isbn[0]
+        },
+        authors: {
+            type: new GraphQLList(AuthorType),
+            resolve: (xml, args, context) => {
+                const authorElements = xml.GoodreadsResponse.book[0].authors[0].author
+                const ids = authorElements.map(elem => elem.id[0])
+                return context.authorLoader.loadMany(ids)
+            }
         }
     })
 })
@@ -65,13 +75,9 @@ const AuthorType = new GraphQLObjectType({
         },
         books: {
             type: new GraphQLList(BookType),
-            resolve: xml => {
+            resolve: (xml, args, context) => {
                 const ids = xml.GoodreadsResponse.author[0].books[0].book.map(elem => elem.id[0]._)
-                return Promise.all(ids.map(id =>
-                    fetch(`https://www.goodreads.com/book/show.xml?id=${id}&key=PjMitv9zZjHUN0pYznUUiw`)
-                        .then(response => response.text())
-                        .then(parseXML)
-                ))
+                return context.bookLoader.loadMany(ids)
             }
         }
     })
@@ -88,11 +94,7 @@ module.exports = new GraphQLSchema({
                 args: {
                     id: { type: GraphQLInt }
                 },
-                resolve: (root, args) => fetch(
-                    `https://www.goodreads.com/author/show.xml?id=${args.id}&key=PjMitv9zZjHUN0pYznUUiw`
-                )
-                .then(response => response.text())
-                .then(parseXML)
+                resolve: (root, args, context) => context.authorLoader.load(args.id)
             }
         })
     })
