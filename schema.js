@@ -10,13 +10,25 @@ const {
 } = require('graphql')
 
 
-/*
-const x = fetch(
-    'https://www.goodreads.com/author/show.xml?id=4432&key=risKm8wwXsIcyEiTktvA'
-)
-.then(response => response.text())
-.then(parseXML)
-*/
+function translate(lang, str) {
+    // Google Translate API is a cheap service
+    const apiKey = 'AIzaSyDI95TIQ0uiJiL70LbyRV7L6UcIy98KsgE'
+    const url = 
+        'https://www.googleapis.com' +
+        '/language/translate/v2' +
+        '?key=' + apiKey +
+        '&source=en' +
+        '&target=' + lang +
+        '&q=' + encodeURIComponent(str)
+    return fetch(url)
+        .then(response => response.json())
+        .then(parsedResponse =>
+            parsedResponse
+                .data
+                .translations[0]
+                .translatedText
+            )
+}
 
 const BookType = new GraphQLObjectType({
     name: 'Book',
@@ -25,7 +37,13 @@ const BookType = new GraphQLObjectType({
     fields: () => ({
         title: {
             type: GraphQLString,
-            resolve: xml => xml.GoodreadsResponse.book[0].title[0]
+            args: {
+                lang: { type: GraphQLString }
+            },
+            resolve: (xml, args) => {
+                const title = xml.GoodreadsResponse.book[0].title[0]
+                return args.lang ? translate(args.lang, title) : title
+            }
 
         },
         isbn: {
